@@ -42,5 +42,3 @@ manifests:
     - k8s/ingress.yml
     - k8s/router-deployment.yml
     - k8s/router-service.yml
-    - k8s/rbac.yml
-    

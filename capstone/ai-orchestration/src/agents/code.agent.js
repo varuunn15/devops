@@ -8,7 +8,6 @@ const model = new ChatMistralAI({
     apiKey: process.env.MISTRALAI_API_KEY,
     "temperature": 0.7,
 })
-
 const agent = (createAgent({
     model,
     tools: [ listFiles, readFiles, updateFiles ],

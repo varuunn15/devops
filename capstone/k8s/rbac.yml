@@ -23,6 +23,7 @@ subjects:
 - kind: ServiceAccount
   name: resource-manager
   namespace: default
+  apiGroup: ""
 roleRef:
   kind: Role
   name: resource-manager
