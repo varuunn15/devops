@@ -3,13 +3,17 @@ import express from "express";
 import morgan from "morgan";
 import mongoose from "mongoose";
 import Redis from "ioredis";
-import User from "./modules/user.model.js";
+import { User } from "./models/user.model.js";
+import rateLimit from 'express-rate-limit';
 
-// MongoDB connection
+
+
+
+
+// ---- MongoDB Connection ----
 const connectToMongoDB = async () => {
     try {
         await mongoose.connect(process.env.MONGO_URI);
-
         console.log("Connected to MongoDB");
     } catch (error) {
         console.error("Error connecting to MongoDB:", error);
@@ -18,24 +22,28 @@ const connectToMongoDB = async () => {
 
 connectToMongoDB();
 
-// Redis connection
-const redis = new Redis(process.env.REDIS_URI);
+
+// ---- Redis Connection ----
+const redis = new Redis("redis://localhost:6379");
 
 redis.once("ready", () => {
     console.log("Connected to Redis");
 });
 
-redis.on("error", (error) => {
-    console.error("Redis connection error:", error);
-});
 
-// Express app
+// ---- Express App Setup ----
 const app = express();
-
 app.use(morgan("dev"));
 app.use(express.json());
 
-// rate limiting middleware
+
+// ---- ejs Template Engine Setup ----
+app.set("view engine", "ejs");
+
+app.set("views", "./views");
+
+app.use(express.static("public"));
+
 const globalLimiter = rateLimit({
     windowMs: 2 * 60 * 1000,  // 2 minutes
     max: 100,                    // 100 requests per window per IP
@@ -47,7 +55,8 @@ const globalLimiter = rateLimit({
 });
 
 // Apply to every route
-app.use(globalLimiter)
+app.use(globalLimiter);
+
 // ---- Routes ----
 app.get("/user/:id", async (req, res) => {
     try {
@@ -87,15 +96,18 @@ app.post("/user", async (req, res) => {
     }
 });
 
-
-// Start server
-const PORT = process.env.PORT || 3000;
-
-app.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}`);
+app.get("/", async (req, res) => {
+    res.render("index", {
+        username: "Building",
+        bio: "Something about Building",
+        profilePicture: "https://images.unsplash.com/photo-1779206746296-b7d3f467e55d?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxmZWF0dXJlZC1waG90b3MtZmVlZHw0OHx8fGVufDB8fHx8fA%3D%3D"
+    });
 });
 
 
 
-            
-
+// ---- Start Server ----
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+    console.log(`Server is running on port ${PORT}`);
+});
