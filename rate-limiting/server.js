@@ -4,6 +4,8 @@ import morgan from "morgan";
 import mongoose from "mongoose";
 import Redis from "ioredis";
 import User from "./modules/user.model.js";
+import rateLimit from 'express-rate-limit';
+
 
 // MongoDB connection
 const connectToMongoDB = async () => {
@@ -54,6 +56,23 @@ app.get("/user/:id", async (req, res) => {
         });
     }
 });
+
+
+
+const globalLimiter = rateLimit({
+    windowMs: 2 * 60 * 1000,  // 2 minutes
+    max: 100,                    // 100 requests per window per IP
+    message: {
+        error: 'Too many requests. Please try again later.'
+    },
+    statusCode: 429,
+    standardHeaders: true,   // sends RateLimit-* headers
+});
+
+// Apply to every route
+app.use(globalLimiter);
+
+
 
 // POST user
 app.post("/user", async (req, res) => {
