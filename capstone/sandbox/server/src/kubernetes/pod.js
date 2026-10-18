@@ -1,6 +1,6 @@
 import { k8sCoreV1Api } from "./config.js";
 
-
+//ye pods ki configuration hai jo sandbox ke liye create ki ja rahi hai. Ye pod do containers ko run karega: ek "sandbox-container" aur ek "agent-container". Init container ka kaam hai workspace ke files ko seed directory me copy karna. Ye pod ek emptyDir volume ka use karta hai jisse dono containers ke beech data share kiya ja sake.
 export async function createPod(sandboxId) {
 
     const podManifest = {
