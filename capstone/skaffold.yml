@@ -1,19 +1,27 @@
 apiVersion: skaffold/v4beta13
 kind: Config
-build: 
+
+build:
+  tagPolicy:
+    sha256: {}
+    
   artifacts:
+  
   - image: ai-orchestration
     context: ai-orchestration
     docker:
       dockerfile: dockerfile
     sync:
       infer:
-        - "src/**"     
+        - "src/**"
+
 
   - image: agent
     context: sandbox/agent
     docker:
       dockerfile: dockerfile
+
+ 
 
   - image: router
     context: sandbox/router
@@ -39,3 +47,4 @@ manifests:
     - k8s/ingress.yml
     - k8s/router-deployment.yml
     - k8s/router-service.yml
+    - k8s/rbac.yml
