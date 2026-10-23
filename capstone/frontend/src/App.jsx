@@ -24,8 +24,13 @@ export default function App() {
   const dragStartH = useRef(0)
 
   const handleSandboxCreated = useCallback((data) => {
-    const agentBase = `https://${data.sandboxId}.agent.cryboy.in`
-    setSandbox({ sandboxId: data.sandboxId, previewUrl: data.previewUrl, agentBase })
+    // The API returns the environment-specific preview hostname. Derive the
+    // agent hostname from it so local sandboxes use *.agent.localhost and
+    // production sandboxes use the matching production domain.
+    const preview = new URL(data.previewUrl, window.location.origin)
+    const agentUrl = new URL(data.previewUrl, window.location.origin)
+    agentUrl.hostname = preview.hostname.replace('.preview.', '.agent.')
+    setSandbox({ sandboxId: data.sandboxId, previewUrl: data.previewUrl, agentBase: agentUrl.origin })
     setStatus('ready')
   }, [])
 
@@ -112,7 +117,7 @@ export default function App() {
 
           {/* Terminal */}
           <div className="shrink-0 overflow-hidden" style={{ height: `${terminalHeight}px` }}>
-            <Terminal sandboxId={sandboxId} />
+            <Terminal sandboxId={sandboxId} agentBase={agentBase} />
           </div>
         </div>
 

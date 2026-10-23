@@ -9,6 +9,10 @@ export const createService = async (sandboxId) => {
             }
         },
         spec: {
+            // A sandbox can still serve preview and terminal traffic when its
+            // optional S3 sync sidecar is unavailable. Route to the live app
+            // containers while Kubernetes reports the Pod as partially ready.
+            publishNotReadyAddresses: true,
             selector: {
                 sandboxId: sandboxId
             },
@@ -28,21 +32,28 @@ export const createService = async (sandboxId) => {
             ],
             type: "ClusterIP"
         }
-    }
+    };
 
     const response = await k8sCoreV1Api.createNamespacedService({
         namespace: 'default',
         body: serviceManifest
-    })
+    });
 
     return response;
-}
+};
 
 export async function deleteService(sandboxId) {
-    const response = await k8sCoreV1Api.deleteNamespacedService({
-        namespace: 'default',
-        name: `sandbox-service-${sandboxId}`
-    })
-
-    return response;
+    try {
+        const response = await k8sCoreV1Api.deleteNamespacedService({
+            name: `sandbox-service-${sandboxId}`,
+            namespace: 'default'
+        });
+        return response;
+    } catch (err) {
+        if (err.statusCode === 404 || err.response?.statusCode === 404) {
+            return null;
+        }
+        console.error(`Error deleting service sandbox-service-${sandboxId}:`, err);
+        throw err;
+    }
 }

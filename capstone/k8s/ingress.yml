@@ -16,7 +16,7 @@ metadata:
     nginx.ingress.kubernetes.io/session-cookie-name: "route"
     nginx.ingress.kubernetes.io/session-cookie-path: "/"
     nginx.ingress.kubernetes.io/enable-cors: "true"
-    nginx.ingress.kubernetes.io/cors-allow-origin: "http://www.cryboy.in"
+    nginx.ingress.kubernetes.io/cors-allow-origin: "https://www.cryboy.in,http://localhost:5173"
     nginx.ingress.kubernetes.io/cors-allow-credentials: "true"
     nginx.ingress.kubernetes.io/cors-allow-methods: "PUT, GET, POST, OPTIONS, DELETE"
   labels:
@@ -52,6 +52,13 @@ spec:
             name: auth-service
             port: 
               number: 80
+      - pathType: Prefix
+        path: "/"
+        backend:
+          service:
+            name: frontend-service
+            port:
+              number: 5173
 
 
   - host: "*.preview.cryboy.in"
@@ -75,4 +82,26 @@ spec:
           service:
             name: router-service
             port: 
+              number: 80
+
+  - host: "*.preview.localhost"
+    http:
+      paths:
+      - pathType: Prefix
+        path: "/"
+        backend:
+          service:
+            name: router-service
+            port:
+              number: 80
+
+  - host: "*.agent.localhost"
+    http:
+      paths:
+      - pathType: Prefix
+        path: "/"
+        backend:
+          service:
+            name: router-service
+            port:
               number: 80

@@ -42,6 +42,7 @@ agentRouter.post("/invoke", async (req, res) => {
     } catch (error) {
         console.error("Error invoking agent:", error);
         if (res.headersSent) {
+            res.write(`ERROR: ${error?.message || "AI request failed"}\n`);
             res.end();
         } else {
             res.status(500).json({ error: "Failed to invoke agent" });

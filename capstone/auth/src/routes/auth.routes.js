@@ -37,20 +37,29 @@ router.get('/google/callback', passport.authenticate('google', {
             action: 'google_login',
             timestamp: new Date(),
             email: emails[ 0 ].value
-        })
+        });
 
         // Generate JWT token
-        const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '1h' });
+        const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '7d' });
+
+        const isProduction = process.env.NODE_ENV === 'production';
+        const frontendUrl = process.env.FRONTEND_URL || (isProduction ? 'https://www.cryboy.in' : 'http://localhost:5173');
+        const cookieDomain = process.env.COOKIE_DOMAIN || (isProduction ? '.cryboy.in' : undefined);
 
         // Set token in cookie
-        res.cookie('token', token, {
+        const cookieOptions = {
             httpOnly: true,           // JS can't read it — XSS protection
-            secure: true,             // only sent over HTTPS
-            sameSite: 'none',         // allow cross-site (iframes, different subdomains)
-            domain: '.cryboy.in',     // works across all *.cryboy.in subdomains
+            secure: isProduction,     // only sent over HTTPS in production
+            sameSite: isProduction ? 'none' : 'lax',
             maxAge: 7 * 24 * 60 * 60 * 1000  // 7 days
-        });
-        res.redirect('https://www.cryboy.in'); // Redirect to your frontend after successful login
+        };
+
+        if (cookieDomain) {
+            cookieOptions.domain = cookieDomain;
+        }
+
+        res.cookie('token', token, cookieOptions);
+        res.redirect(frontendUrl); // Redirect to frontend after successful login
     } catch (err) {
         console.error('Error during Google authentication:', err);
         res.redirect('/'); // Redirect to your frontend on error

@@ -11,15 +11,21 @@ export default function SplashScreen({ onSandboxCreated }) {
   // Existing projects
   const [ projects, setProjects ] = useState([])
   const [ projectsLoading, setProjectsLoading ] = useState(true)
+  const [ authRequired, setAuthRequired ] = useState(false)
 
   // Fetch existing projects on mount
   useEffect(() => {
     const fetchProjects = async () => {
       try {
         const res = await fetch('/api/sandbox/project', { credentials: 'include' })
+        if (res.status === 401) {
+          setAuthRequired(true)
+          return
+        }
         if (res.ok) {
           const data = await res.json()
           setProjects(data.projects || [])
+          setAuthRequired(false)
         }
       } catch {
         // Silently ignore — user may not be logged in yet
@@ -50,6 +56,10 @@ export default function SplashScreen({ onSandboxCreated }) {
         credentials: 'include',
         body: JSON.stringify({ projectId })
       })
+      if (sandboxRes.status === 401) {
+        setAuthRequired(true)
+        throw new Error('Sign in with Google before starting a project.')
+      }
       if (!sandboxRes.ok) throw new Error(`Failed to start sandbox (${sandboxRes.status})`)
       const sandboxData = await sandboxRes.json()
       onSandboxCreated(sandboxData)
@@ -77,6 +87,10 @@ export default function SplashScreen({ onSandboxCreated }) {
         credentials: 'include',
         body: JSON.stringify({ title: projectTitle })
       })
+      if (projectRes.status === 401) {
+        setAuthRequired(true)
+        throw new Error('Sign in with Google before creating a project.')
+      }
       if (!projectRes.ok) throw new Error(`Failed to create project (${projectRes.status})`)
       const projectData = await projectRes.json()
       const projectId = projectData.project._id
@@ -89,6 +103,10 @@ export default function SplashScreen({ onSandboxCreated }) {
         credentials: 'include',
         body: JSON.stringify({ projectId })
       })
+      if (sandboxRes.status === 401) {
+        setAuthRequired(true)
+        throw new Error('Sign in with Google before starting a project.')
+      }
       if (!sandboxRes.ok) throw new Error(`Failed to start sandbox (${sandboxRes.status})`)
       const sandboxData = await sandboxRes.json()
       onSandboxCreated(sandboxData)
@@ -265,6 +283,20 @@ export default function SplashScreen({ onSandboxCreated }) {
         {/* New project input + CTA */}
         {!isAnyLoading ? (
           <div className="flex flex-col items-center gap-4 w-full" style={{ maxWidth: '420px' }}>
+            {authRequired && (
+              <a href="/api/auth/google"
+                className="w-full py-4 rounded-xl text-base font-semibold transition-all duration-300"
+                style={{
+                  display: 'block',
+                  background: 'linear-gradient(135deg, #22d3ee, #0891b2)',
+                  color: '#070b14',
+                  boxShadow: '0 0 30px rgba(34,211,238,0.3), 0 4px 20px rgba(0,0,0,0.3)',
+                  textDecoration: 'none'
+                }}>
+                Sign in with Google to continue
+              </a>
+            )}
+            {!authRequired && <>
             <div className="w-full rounded-xl overflow-hidden"
               style={{
                 background: 'rgba(255,255,255,0.03)',
@@ -303,6 +335,7 @@ export default function SplashScreen({ onSandboxCreated }) {
                 Create New Project
               </span>
             </button>
+            </>}
           </div>
         ) : (
           <div className="flex flex-col items-center gap-4">

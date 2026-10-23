@@ -4,7 +4,7 @@ import { FitAddon } from '@xterm/addon-fit'
 import { WebLinksAddon } from '@xterm/addon-web-links'
 import { io } from 'socket.io-client'
 
-export default function Terminal({ sandboxId }) {
+export default function Terminal({ sandboxId, agentBase }) {
   const containerRef = useRef(null)
   const termRef = useRef(null)
   const fitAddonRef = useRef(null)
@@ -70,12 +70,14 @@ export default function Terminal({ sandboxId }) {
   const connectSocket = useCallback((term) => {
     if (!sandboxId || !term) return
 
-    const agentHost = `https://${sandboxId}.agent.cryboy.in`
+    const agentHost = agentBase
 
     try {
       const socket = io(agentHost, {
         transports: ['websocket', 'polling'],
-        reconnectionAttempts: 5,
+        // Sandbox services can take a short time to become routable after
+        // startup; keep retrying until the pod is reachable.
+        reconnectionAttempts: Infinity,
         reconnectionDelay: 1000,
       })
 
@@ -110,7 +112,7 @@ export default function Terminal({ sandboxId }) {
     } catch (err) {
       setError(err.message)
     }
-  }, [sandboxId])
+  }, [sandboxId, agentBase])
 
   useEffect(() => {
     const term = initTerminal()

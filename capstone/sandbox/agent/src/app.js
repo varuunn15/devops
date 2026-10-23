@@ -8,8 +8,14 @@ import pty from 'node-pty';
 import os from 'os';
 import cors from 'cors';
 
-
-const WORKING_DIR = '/workspace';
+const WORKING_DIR = fs.existsSync('/workspace') ? '/workspace' : path.resolve(process.cwd(), 'workspace');
+if (!fs.existsSync(WORKING_DIR)) {
+    try {
+        fs.mkdirSync(WORKING_DIR, { recursive: true });
+    } catch {
+        // ignore if cannot create
+    }
+}
 
 const app = express();
 const httpServer = http.createServer(app);
@@ -30,7 +36,6 @@ const io = new Server(httpServer, {
     }
 });
 
-
 app.get('/', (req, res) => {
     res.status(200).json({
         message: 'Hello from sandbox agent!',
@@ -38,38 +43,51 @@ app.get('/', (req, res) => {
     });
 });
 
-
-
-const shell = process.env.SHELL || 'bash';
-
-// Spawn the PTY process
-const ptyProcess = pty.spawn(shell, [], {
-    name: 'xterm-color',
-    cols: 80,
-    rows: 30,
-    cwd: "/workspace",
-    env: process.env
+app.get("/_status/healthz", (req, res) => {
+    res.status(200).json({ status: "ok" });
 });
 
-ptyProcess.onData((data) => {
-    io.emit('terminal-output', data);
+app.get("/_status/readyz", (req, res) => {
+    res.status(200).json({ status: "ready" });
 });
 
-ptyProcess.onExit(({ exitCode, signal }) => {
-    console.log(`PTY process exited with code: ${exitCode}, signal: ${signal}`);
-});
+const defaultShell = os.platform() === 'win32' ? (process.env.COMSPEC || 'powershell.exe') : 'bash';
+const shell = process.env.SHELL || defaultShell;
+
+let ptyProcess = null;
+try {
+    ptyProcess = pty.spawn(shell, [], {
+        name: 'xterm-color',
+        cols: 80,
+        rows: 30,
+        cwd: WORKING_DIR,
+        env: process.env
+    });
+
+    ptyProcess.onData((data) => {
+        io.emit('terminal-output', data);
+    });
+
+    ptyProcess.onExit(({ exitCode, signal }) => {
+        console.log(`PTY process exited with code: ${exitCode}, signal: ${signal}`);
+    });
+} catch (err) {
+    console.error('PTY spawn failed:', err.message);
+}
 
 io.on("connection", (socket) => {
     console.log("Client connected: " + socket.id);
 
     socket.on("terminal-input", (data) => {
-        ptyProcess.write(data);
+        if (ptyProcess) {
+            ptyProcess.write(data);
+        }
     });
 
     socket.on("disconnect", () => {
         console.log("Client disconnected: " + socket.id);
     });
-})
+});
 
 /**
  * @route GET /list-files
@@ -100,7 +118,7 @@ app.get("/list-files", async (req, res) => {
             if (entry.isDirectory()) {
                 files.push(...await listFiles(fullPath, baseDir));
             } else {
-                files.push(relativePath);
+                files.push(relativePath.replace(/\\/g, '/'));
             }
         }
 
@@ -120,7 +138,7 @@ app.get("/list-files", async (req, res) => {
         });
     }
 
-})
+});
 
 
 /**
@@ -142,15 +160,16 @@ app.get("/read-files", async (req, res) => {
     const fileList = files.split(',');
 
     const results = await Promise.all(fileList.map(async (file) => {
-        const filePath = path.join(WORKING_DIR, file);
+        const cleanFile = file.startsWith('/') ? file.slice(1) : file;
+        const filePath = path.join(WORKING_DIR, cleanFile);
         try {
             const content = await fs.promises.readFile(filePath, 'utf-8');
             return {
-                [ filePath.replace(WORKING_DIR, '') ]: content,
+                [ '/' + path.relative(WORKING_DIR, filePath).replace(/\\/g, '/') ]: content,
             }
         } catch (err) {
             return {
-                [ filePath.replace(WORKING_DIR, '') ]: `Error reading file: ${err.message}`,
+                [ '/' + path.relative(WORKING_DIR, filePath).replace(/\\/g, '/') ]: `Error reading file: ${err.message}`,
             }
         }
     }));
@@ -160,7 +179,7 @@ app.get("/read-files", async (req, res) => {
         files: results,
     });
 
-})
+});
 
 
 /**
@@ -180,19 +199,17 @@ app.patch("/update-files", async (req, res) => {
 
     const results = await Promise.all(updates.map(async (update) => {
         const { file, content } = update;
-        const filePath = path.join(WORKING_DIR, file);
+        const cleanFile = file.startsWith('/') ? file.slice(1) : file;
+        const filePath = path.join(WORKING_DIR, cleanFile);
         try {
-
-            console.log(path.dirname(filePath), filePath);
-
             await fs.promises.mkdir(path.dirname(filePath), { recursive: true });
             await fs.promises.writeFile(filePath, content, 'utf-8');
             return {
-                [ filePath ]: 'File updated successfully',
+                [ '/' + path.relative(WORKING_DIR, filePath).replace(/\\/g, '/') ]: 'File updated successfully',
             }
         } catch (err) {
             return {
-                [ filePath ]: `Error updating file: ${err.message}`,
+                [ '/' + path.relative(WORKING_DIR, filePath).replace(/\\/g, '/') ]: `Error updating file: ${err.message}`,
             }
         }
     }));
@@ -201,7 +218,7 @@ app.patch("/update-files", async (req, res) => {
         message: 'File update results',
         results,
     });
-})
+});
 
 
 /**
@@ -220,17 +237,17 @@ app.post("/create-files", async (req, res) => {
 
     const results = await Promise.all(files.map(async (fileObj) => {
         const { file, content } = fileObj;
-        const filePath = path.join(WORKING_DIR, file);
+        const cleanFile = file.startsWith('/') ? file.slice(1) : file;
+        const filePath = path.join(WORKING_DIR, cleanFile);
         try {
-
             await fs.promises.mkdir(path.dirname(filePath), { recursive: true });
             await fs.promises.writeFile(filePath, content, 'utf-8');
             return {
-                [ filePath ]: 'File created successfully',
+                [ '/' + path.relative(WORKING_DIR, filePath).replace(/\\/g, '/') ]: 'File created successfully',
             }
         } catch (err) {
             return {
-                [ filePath ]: `Error creating file: ${err.message}`,
+                [ '/' + path.relative(WORKING_DIR, filePath).replace(/\\/g, '/') ]: `Error creating file: ${err.message}`,
             }
         }
     }));
@@ -239,7 +256,6 @@ app.post("/create-files", async (req, res) => {
         message: 'File creation results',
         results,
     });
-})
-
+});
 
 export default httpServer;
