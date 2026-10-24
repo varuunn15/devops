@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import SplashScreen from './components/SplashScreen'
 import TopBar from './components/TopBar'
 import FileExplorer from './components/FileExplorer'
@@ -8,6 +8,9 @@ import Terminal from './components/Terminal'
 import AiChat from './components/AiChat'
 
 export default function App() {
+  // User state
+  const [user, setUser] = useState(null)
+
   // Sandbox state
   const [sandbox, setSandbox] = useState(null) // { sandboxId, previewUrl, agentBase }
   const [status, setStatus] = useState('ready')
@@ -16,6 +19,46 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('preview') // 'preview' | 'files'
   const [activeFile, setActiveFile] = useState(null)
   const [fileRefreshKey, setFileRefreshKey] = useState(0)
+
+  // Check authenticated user on mount
+  const fetchUser = useCallback(async () => {
+    try {
+      const res = await fetch('/api/auth/me', { credentials: 'include' })
+      if (res.ok) {
+        const data = await res.json()
+        if (data.authenticated && data.user) {
+          setUser(data.user)
+          return data.user
+        }
+      }
+    } catch (err) {
+      console.warn('Failed to fetch user:', err)
+    }
+    setUser(null)
+    return null
+  }, [])
+
+  useEffect(() => {
+    fetchUser()
+  }, [fetchUser])
+
+  // Logout handler
+  const handleLogout = useCallback(async () => {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' })
+    } catch (err) {
+      console.warn('Error during logout:', err)
+    }
+    setUser(null)
+    setSandbox(null)
+    // Reload to ensure all cookies, caches, and storage are freshly reset
+    window.location.href = '/'
+  }, [])
+
+  // Return from active sandbox to dashboard / splash
+  const handleBackToDashboard = useCallback(() => {
+    setSandbox(null)
+  }, [])
 
   // Terminal resize
   const [terminalHeight, setTerminalHeight] = useState(220)
@@ -66,7 +109,14 @@ export default function App() {
 
   // Landing / splash
   if (!sandbox) {
-    return <SplashScreen onSandboxCreated={handleSandboxCreated} />
+    return (
+      <SplashScreen
+        onSandboxCreated={handleSandboxCreated}
+        user={user}
+        onUserChange={setUser}
+        onLogout={handleLogout}
+      />
+    )
   }
 
   const { sandboxId, previewUrl, agentBase } = sandbox
@@ -81,6 +131,9 @@ export default function App() {
         activeTab={activeTab}
         onTabChange={setActiveTab}
         status={status}
+        user={user}
+        onLogout={handleLogout}
+        onBackToDashboard={handleBackToDashboard}
       />
 
       {/* Main layout */}

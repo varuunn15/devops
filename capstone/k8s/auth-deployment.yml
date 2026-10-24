@@ -15,8 +15,8 @@ spec:
         app: auth
     spec:
       containers:
-      - image: auth
-        imagePullPolicy: IfNotPresent
+      - image: 688928000248.dkr.ecr.ap-southeast-1.amazonaws.com/auth:latest
+        imagePullPolicy: Always
         name:  auth-container
         resources:
           requests:
@@ -69,11 +69,14 @@ spec:
               name: jwt
               key: JWT_SECRET
         - name: GOOGLE_CALLBACK_URL
-          value: http://localhost:5173/api/auth/google/callback
+          value: http://agentspace.54.255.113.123.nip.io/api/auth/google/callback
         - name: FRONTEND_URL
-          value: http://localhost:5173
+          value: http://agentspace.54.255.113.123.nip.io
         ports:
         - containerPort:  3000
           name: auth-http
         
       
+
+
+

@@ -3,12 +3,20 @@ import { k8sCoreV1Api } from "./config.js";
 //ye pods ki configuration hai jo sandbox ke liye create ki ja rahi hai. Ye pod containers ko run karega: "sandbox-container", "agent-container", aur agar projectId provided hai toh "sync-agent-container". Init container ka kaam hai workspace ke files ko seed directory me copy karna. Ye pod ek emptyDir volume ka use karta hai jisse containers ke beech data share kiya ja sake.
 export async function createPod(sandboxId, projectId) {
 
+    const isProduction = process.env.NODE_ENV === 'production';
+    const previewDomain = process.env.PREVIEW_DOMAIN || (isProduction ? 'preview.cryboy.in' : 'preview.localhost:8080');
+    const configuredPreviewPort = new URL(`http://${previewDomain}`).port;
+    const hmrClientPort = configuredPreviewPort || (isProduction ? '443' : '8080');
+
     const containers = [
         {
-            image: "template",
+            image: "688928000248.dkr.ecr.ap-southeast-1.amazonaws.com/template",
             imagePullPolicy: "IfNotPresent",
             name: 'sandbox-container',
             ports: [ { containerPort: 5173, name: "http" } ],
+            env: [
+                { name: 'VITE_HMR_CLIENT_PORT', value: hmrClientPort }
+            ],
             resources: {
                 limits: { cpu: "500m", memory: "1Gi" },
                 requests: { cpu: "250m", memory: "500Mi" }
@@ -21,7 +29,7 @@ export async function createPod(sandboxId, projectId) {
             ]
         },
         {
-            image: "agent",
+            image: "688928000248.dkr.ecr.ap-southeast-1.amazonaws.com/agent",
             imagePullPolicy: "IfNotPresent",
             name: 'agent-container',
             ports: [ { containerPort: 3000, name: "http" } ],
@@ -46,7 +54,7 @@ export async function createPod(sandboxId, projectId) {
     );
     if (projectId && hasAwsCredentials) {
         containers.push({
-            image: "sync-agent",
+            image: "688928000248.dkr.ecr.ap-southeast-1.amazonaws.com/sync-agent",
             imagePullPolicy: "IfNotPresent",
             name: 'sync-agent-container',
             env: [
@@ -83,7 +91,7 @@ export async function createPod(sandboxId, projectId) {
             initContainers: [
                 {
                     name: "init-container",
-                    image: "template",
+                    image: "688928000248.dkr.ecr.ap-southeast-1.amazonaws.com/template",
                     imagePullPolicy: "IfNotPresent",
                     command: ["sh", "-c", "cp -r /workspace/. /seed/"],
                     volumeMounts: [

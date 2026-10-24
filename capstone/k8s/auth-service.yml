@@ -1,14 +1,16 @@
 kind: Service
 apiVersion: v1
 metadata:
-  name:  auth-service
+  name: auth-service
   labels:
-    app:  auth
+    app: auth
+  annotations:
+    alb.ingress.kubernetes.io/healthcheck-path: /_status/healthz
 spec:
   selector:
-    app:  auth
+    app: auth
   type: ClusterIP
   ports:
-  - name:  auth-http
-    port:  80
-    targetPort:  3000
+  - name: auth-http
+    port: 80
+    targetPort: 3000

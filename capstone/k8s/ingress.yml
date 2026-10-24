@@ -3,65 +3,16 @@ kind: Ingress
 metadata:
   name: codespace-ingress
   annotations:
-    # Time in seconds to wait for a response from the pod
-    nginx.ingress.kubernetes.io/proxy-read-timeout: "6000"
-    
-    # Time in seconds to wait for data to be sent to the pod
-    nginx.ingress.kubernetes.io/proxy-send-timeout: "6000"
-    
-    # Time in seconds to establish a connection to the pod
-    nginx.ingress.kubernetes.io/proxy-connect-timeout: "6000"
-  
-    nginx.ingress.kubernetes.io/affinity: "cookie"
-    nginx.ingress.kubernetes.io/session-cookie-name: "route"
-    nginx.ingress.kubernetes.io/session-cookie-path: "/"
-    nginx.ingress.kubernetes.io/enable-cors: "true"
-    nginx.ingress.kubernetes.io/cors-allow-origin: "https://www.cryboy.in,http://localhost:5173"
-    nginx.ingress.kubernetes.io/cors-allow-credentials: "true"
-    nginx.ingress.kubernetes.io/cors-allow-methods: "PUT, GET, POST, OPTIONS, DELETE"
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}]'
   labels:
     app.kubernetes.io/name: codespace-ingress
 spec:
-  ingressClassName: nginx
+  ingressClassName: alb
   rules:
-  - http:
-      paths:
-      - pathType: Prefix
-        path: "/api/sandbox"
-        backend:
-          service:
-            name: sandbox-service
-            port: 
-              number: 80
-
-  - http:
-      paths:
-      - pathType: Prefix
-        path: "/api/ai"
-        backend:
-          service:
-            name: ai-service
-            port: 
-              number: 80
-  - http:
-      paths:
-      - pathType: Prefix
-        path: "/api/auth"
-        backend:
-          service:
-            name: auth-service
-            port: 
-              number: 80
-      - pathType: Prefix
-        path: "/"
-        backend:
-          service:
-            name: frontend-service
-            port:
-              number: 5173
-
-
-  - host: "*.preview.cryboy.in"
+  # Wildcard subdomains for sandbox preview and agent proxies (Must be evaluated first)
+  - host: "*.preview.agentspace.54.255.113.123.nip.io"
     http:
       paths:
       - pathType: Prefix
@@ -72,8 +23,29 @@ spec:
             port: 
               number: 80
 
+  - host: "*.agent.agentspace.54.255.113.123.nip.io"
+    http:
+      paths:
+      - pathType: Prefix
+        path: "/"
+        backend:
+          service:
+            name: router-service
+            port: 
+              number: 80
 
-  - host: "*.agent.cryboy.in"
+  - host: "*.preview.54.255.113.123.nip.io"
+    http:
+      paths:
+      - pathType: Prefix
+        path: "/"
+        backend:
+          service:
+            name: router-service
+            port: 
+              number: 80
+
+  - host: "*.agent.54.255.113.123.nip.io"
     http:
       paths:
       - pathType: Prefix
@@ -105,3 +77,35 @@ spec:
             name: router-service
             port:
               number: 80
+
+  # API and Main Frontend routes
+  - http:
+      paths:
+      - pathType: Prefix
+        path: "/api/sandbox"
+        backend:
+          service:
+            name: sandbox-service
+            port: 
+              number: 80
+      - pathType: Prefix
+        path: "/api/ai"
+        backend:
+          service:
+            name: ai-service
+            port: 
+              number: 80
+      - pathType: Prefix
+        path: "/api/auth"
+        backend:
+          service:
+            name: auth-service
+            port: 
+              number: 80
+      - pathType: Prefix
+        path: "/"
+        backend:
+          service:
+            name: frontend-service
+            port:
+              number: 5173

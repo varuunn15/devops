@@ -21,7 +21,7 @@ app.use(morgan('dev'));
 app.use(cookies());
 app.use(passport.initialize());
 app.use(cors({
-    origin: [ 'https://www.cryboy.in', /\.cryboy\.in$/, 'http://localhost:5173' ],
+    origin: (origin, callback) => callback(null, true),
     credentials: true,   // critical — allows cookies in cross-origin requests
     methods: [ 'GET', 'POST', 'PUT', 'DELETE', 'OPTIONS' ],
 }));

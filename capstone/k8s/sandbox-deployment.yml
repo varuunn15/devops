@@ -16,7 +16,7 @@ spec:
     spec:
       serviceAccountName: resource-manager
       containers:
-      - image: sandbox
+      - image: 688928000248.dkr.ecr.ap-southeast-1.amazonaws.com/sandbox
         imagePullPolicy: IfNotPresent
         name:  main-sandbox-container
         resources:
@@ -51,9 +51,9 @@ spec:
                 name: database
                 key: SANDBOX
           - name: SANDBOX_DOMAIN
-            value: localhost
+            value: agentspace.54.255.113.123.nip.io
           - name: PREVIEW_DOMAIN
-            value: preview.localhost:8080
+            value: preview.agentspace.54.255.113.123.nip.io
           - name: SANDBOX_PROTOCOL
             value: http
           - name: AWS_REGION

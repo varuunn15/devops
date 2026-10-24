@@ -28,7 +28,7 @@ function buildTree(files) {
   return root
 }
 
-function TreeNode({ name, node, depth, agentBase, activeFile, onFileSelect, path }) {
+function TreeNode({ name, node, depth, activeFile, onFileSelect, path }) {
   const [open, setOpen] = useState(depth < 2)
   const isDir = node !== null && typeof node === 'object'
   const fullPath = path ? `${path}/${name}` : name
@@ -58,7 +58,7 @@ function TreeNode({ name, node, depth, agentBase, activeFile, onFileSelect, path
               return bDir - aDir
             }).map(([childName, childNode]) => (
               <TreeNode key={childName} name={childName} node={childNode}
-                depth={depth + 1} agentBase={agentBase} activeFile={activeFile}
+                depth={depth + 1} activeFile={activeFile}
                 onFileSelect={onFileSelect} path={fullPath} />
             ))}
           </div>
@@ -97,10 +97,12 @@ export default function FileExplorer({ agentBase, activeFile, onFileSelect, refr
     setError(null)
     try {
       const res = await fetch(`${agentBase}/list-files`)
+      if (!res.ok) throw new Error(`File service returned ${res.status}`)
       const data = await res.json()
+      if (!Array.isArray(data.files)) throw new Error('File service returned an invalid file list')
       setFiles(data.files || [])
       setTree(buildTree(data.files || []))
-    } catch (err) {
+    } catch {
       setError('Failed to load files')
     } finally {
       setLoading(false)
@@ -147,7 +149,7 @@ export default function FileExplorer({ agentBase, activeFile, onFileSelect, refr
             return bDir - aDir
           }).map(([name, node]) => (
             <TreeNode key={name} name={name} node={node}
-              depth={0} agentBase={agentBase} activeFile={activeFile}
+              depth={0} activeFile={activeFile}
               onFileSelect={onFileSelect} path="" />
           ))
         )}

@@ -76,8 +76,16 @@ function parseActivityLine(line) {
   return { type: 'info', text: line }
 }
 
+function explainAiError(error) {
+  const message = error?.message || 'The AI request failed.'
+  if (/\b429\b|rate.?limit|quota/i.test(message)) {
+    return 'The AI provider is rate-limiting requests (HTTP 429), so it could not make changes. Your sandbox is still running. Check the Mistral API quota and try again.'
+  }
+  return `Error: ${message}`
+}
+
 export default function AiChat({ sandboxId, onFilesChanged }) {
-  const [messages, setMessages] = useState([
+  const [messages, setMessages] = useState(() => [
     {
       role: 'assistant',
       content: 'Hi! I can modify your sandbox project. Describe what you want to build or change, and I\'ll update the code for you.',
@@ -88,8 +96,6 @@ export default function AiChat({ sandboxId, onFilesChanged }) {
   const [input, setInput] = useState('')
   const [streaming, setStreaming] = useState(false)
   const bottomRef = useRef(null)
-  const esRef = useRef(null)
-  const textareaRef = useRef(null)
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -177,7 +183,7 @@ export default function AiChat({ sandboxId, onFilesChanged }) {
     } catch (err) {
       setMessages(prev => prev.map(m =>
         m.id === aiMsgId
-          ? { ...m, content: `Error: ${err.message}`, activity: activityLines, pending: false }
+          ? { ...m, content: explainAiError(err), activity: activityLines, pending: false }
           : m
       ))
     } finally {
@@ -248,7 +254,6 @@ export default function AiChat({ sandboxId, onFilesChanged }) {
           onFocusCapture={e => e.currentTarget.style.borderColor = 'rgba(34,211,238,0.4)'}
           onBlurCapture={e => e.currentTarget.style.borderColor = '#1e2d45'}>
           <textarea
-            ref={textareaRef}
             value={input}
             onChange={e => setInput(e.target.value)}
             onKeyDown={handleKeyDown}

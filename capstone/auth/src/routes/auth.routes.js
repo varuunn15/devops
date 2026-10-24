@@ -66,5 +66,64 @@ router.get('/google/callback', passport.authenticate('google', {
     }
 });
 
+// Get current authenticated user profile
+router.get('/me', async (req, res) => {
+    try {
+        const token = req.cookies?.token || req.headers[ 'authorization' ]?.split(' ')[ 1 ];
+        if (!token) {
+            return res.status(401).json({ authenticated: false, message: 'Not authenticated' });
+        }
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const user = await User.findById(decoded.id).select('-__v');
+        if (!user) {
+            return res.status(401).json({ authenticated: false, message: 'User not found' });
+        }
+        return res.status(200).json({
+            authenticated: true,
+            user: {
+                id: user._id,
+                email: user.email,
+                name: user.name,
+                avatar: user.avatar
+            }
+        });
+    } catch (err) {
+        return res.status(401).json({ authenticated: false, message: 'Invalid or expired token' });
+    }
+});
+
+// Logout endpoint — clears authentication token cookie
+const handleLogout = (req, res) => {
+    const isProduction = process.env.NODE_ENV === 'production';
+    const cookieDomain = process.env.COOKIE_DOMAIN || (isProduction ? '.cryboy.in' : undefined);
+
+    const cookieOptions = {
+        httpOnly: true,
+        secure: isProduction,
+        sameSite: isProduction ? 'none' : 'lax'
+    };
+
+    if (cookieDomain) {
+        cookieOptions.domain = cookieDomain;
+    }
+
+    res.cookie('token', '', { ...cookieOptions, expires: new Date(0), maxAge: 0 });
+    res.clearCookie('token', cookieOptions);
+
+    if (cookieDomain) {
+        res.cookie('token', '', { ...cookieOptions, domain: undefined, expires: new Date(0), maxAge: 0 });
+        res.clearCookie('token');
+    }
+
+    if (req.xhr || req.headers.accept?.includes('application/json') || req.method === 'POST') {
+        return res.status(200).json({ success: true, message: 'Logged out successfully' });
+    }
+
+    const frontendUrl = process.env.FRONTEND_URL || '/';
+    return res.redirect(frontendUrl);
+};
+
+router.get('/logout', handleLogout);
+router.post('/logout', handleLogout);
 
 export default router;

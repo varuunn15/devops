@@ -24,15 +24,20 @@ export default function FileViewer({ agentBase, filePath }) {
       setContent(null)
       try {
         const res = await fetch(`${agentBase}/read-files?files=${encodeURIComponent(filePath)}`)
+        if (!res.ok) throw new Error(`File service returned ${res.status}`)
         const data = await res.json()
         const fileData = data.files?.[0]
         if (fileData) {
           const fileContent = Object.values(fileData)[0]
-          setContent(fileContent)
+          if (typeof fileContent === 'string' && fileContent.startsWith('Error reading file:')) {
+            setError(fileContent)
+          } else {
+            setContent(fileContent)
+          }
         } else {
           setError('File not found or empty')
         }
-      } catch (err) {
+      } catch {
         setError('Failed to load file')
       } finally {
         setLoading(false)

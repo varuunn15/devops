@@ -1,6 +1,13 @@
 import "dotenv/config";
 import chokidar from 'chokidar';
-import { S3Client, PutObjectCommand, ListObjectsV2Command, GetObjectCommand } from "@aws-sdk/client-s3";
+import {
+    S3Client,
+    PutObjectCommand,
+    ListObjectsV2Command,
+    GetObjectCommand,
+    DeleteObjectCommand,
+    DeleteObjectsCommand,
+} from "@aws-sdk/client-s3";
 import fs from 'fs';
 import path from 'path';
 import { pipeline } from 'stream/promises';
@@ -46,8 +53,13 @@ async function downloadFilesFromS3(s3Objects) {
         });
         const getResponse = await s3Client.send(getCommand);
 
-        const relativePath = file.Key.replace(`${projectId}/`, '');
-        const localFilePath = path.join(localDirectory, relativePath);
+        const relativePath = file.Key.slice(`${projectId}/`.length);
+        const localFilePath = path.resolve(localDirectory, relativePath);
+        const localRelativePath = path.relative(localDirectory, localFilePath);
+        if (!localRelativePath || localRelativePath.startsWith('..') || path.isAbsolute(localRelativePath)) {
+            console.warn(`Skipping unsafe S3 object key: ${file.Key}`);
+            continue;
+        }
 
         // Ensure the local directory structure exists
         fs.mkdirSync(path.dirname(localFilePath), { recursive: true });
@@ -89,6 +101,52 @@ async function uploadFileToS3(filePath) {
     }
 }
 
+async function deleteFileFromS3(filePath) {
+    try {
+        const relativePath = path.relative(localDirectory, filePath);
+        if (!relativePath || relativePath.startsWith('..') || path.isAbsolute(relativePath)) return;
+        if (relativePath.split(path.sep).some((part) => part.startsWith('.') || part === 'node_modules')) return;
+
+        const key = `${projectId}/${relativePath}`.replace(/\\/g, '/');
+        await s3Client.send(new DeleteObjectCommand({ Bucket: bucketName, Key: key }));
+        console.log(`Deleted ${key} from S3`);
+    } catch (err) {
+        console.error(`Error deleting ${filePath} from S3:`, err);
+    }
+}
+
+async function deleteDirectoryFromS3(directoryPath) {
+    try {
+        const relativePath = path.relative(localDirectory, directoryPath);
+        if (!relativePath || relativePath.startsWith('..') || path.isAbsolute(relativePath)) return;
+        if (relativePath.split(path.sep).some((part) => part.startsWith('.') || part === 'node_modules')) return;
+
+        const prefix = `${projectId}/${relativePath.replace(/\\/g, '/')}/`;
+        let continuationToken;
+        do {
+            const page = await s3Client.send(new ListObjectsV2Command({
+                Bucket: bucketName,
+                Prefix: prefix,
+                ContinuationToken: continuationToken,
+            }));
+            const objects = (page.Contents || []).map(({ Key }) => ({ Key }));
+            if (objects.length) {
+                const result = await s3Client.send(new DeleteObjectsCommand({
+                    Bucket: bucketName,
+                    Delete: { Objects: objects, Quiet: true },
+                }));
+                if (result.Errors?.length) {
+                    throw new Error(`S3 rejected ${result.Errors.length} object deletion(s)`);
+                }
+            }
+            continuationToken = page.NextContinuationToken;
+        } while (continuationToken);
+        console.log(`Deleted S3 objects under ${prefix}`);
+    } catch (err) {
+        console.error(`Error deleting ${directoryPath} from S3:`, err);
+    }
+}
+
 function startWatcher(hasFiles) {
     console.log("Starting chokidar watch...");
     chokidar.watch(localDirectory, {
@@ -105,6 +163,10 @@ function startWatcher(hasFiles) {
                 return;
             }
             await uploadFileToS3(filePath);
+        } else if (event === 'unlink') {
+            await deleteFileFromS3(filePath);
+        } else if (event === 'unlinkDir') {
+            await deleteDirectoryFromS3(filePath);
         }
     });
 }

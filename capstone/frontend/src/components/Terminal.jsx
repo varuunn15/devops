@@ -82,10 +82,12 @@ export default function Terminal({ sandboxId, agentBase }) {
       })
 
       socketRef.current = socket
+      let hasLoggedConnectionFailure = false
 
       socket.on('connect', () => {
         setConnected(true)
         setError(null)
+        hasLoggedConnectionFailure = false
         term.writeln('\x1b[32m✓ Connected to sandbox shell\x1b[0m')
         term.writeln('')
       })
@@ -98,7 +100,10 @@ export default function Terminal({ sandboxId, agentBase }) {
       socket.on('connect_error', (err) => {
         setConnected(false)
         setError('Connection failed')
-        term.writeln(`\r\n\x1b[31m✗ Connection error: ${err.message}\x1b[0m`)
+        if (!hasLoggedConnectionFailure) {
+          term.writeln(`\r\n\x1b[31m✗ Connection error: ${err.message}\x1b[0m`)
+          hasLoggedConnectionFailure = true
+        }
       })
 
       socket.on('terminal-output', (data) => {
@@ -128,7 +133,7 @@ export default function Terminal({ sandboxId, agentBase }) {
   useEffect(() => {
     const observer = new ResizeObserver(() => {
       if (fitAddonRef.current) {
-        try { fitAddonRef.current.fit() } catch (_) {}
+        try { fitAddonRef.current.fit() } catch {}
       }
     })
     if (containerRef.current) observer.observe(containerRef.current)

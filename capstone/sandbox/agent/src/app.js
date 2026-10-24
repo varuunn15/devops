@@ -17,6 +17,21 @@ if (!fs.existsSync(WORKING_DIR)) {
     }
 }
 
+function resolveWorkspacePath(file) {
+    if (typeof file !== 'string' || !file.trim()) {
+        throw new Error('A non-empty file path is required');
+    }
+
+    // Agent tools send workspace-relative paths with an optional leading slash.
+    const cleanFile = file.replace(/^[\\/]+/, '');
+    const filePath = path.resolve(WORKING_DIR, cleanFile);
+    const relativePath = path.relative(WORKING_DIR, filePath);
+    if (relativePath === '..' || relativePath.startsWith(`..${path.sep}`) || path.isAbsolute(relativePath)) {
+        throw new Error('File path must stay inside the project workspace');
+    }
+    return filePath;
+}
+
 const app = express();
 const httpServer = http.createServer(app);
 
@@ -159,9 +174,14 @@ app.get("/read-files", async (req, res) => {
 
     const fileList = files.split(',');
 
-    const results = await Promise.all(fileList.map(async (file) => {
-        const cleanFile = file.startsWith('/') ? file.slice(1) : file;
-        const filePath = path.join(WORKING_DIR, cleanFile);
+    let resolvedFiles;
+    try {
+        resolvedFiles = fileList.map((file) => ({ file, filePath: resolveWorkspacePath(file) }));
+    } catch (err) {
+        return res.status(400).json({ message: err.message, status: 'error' });
+    }
+
+    const results = await Promise.all(resolvedFiles.map(async ({ file, filePath }) => {
         try {
             const content = await fs.promises.readFile(filePath, 'utf-8');
             return {
@@ -190,17 +210,27 @@ app.patch("/update-files", async (req, res) => {
 
     const updates = req.body.updates;
 
-    if (!updates || !Array.isArray(updates)) {
+    if (!Array.isArray(updates) || updates.some((update) =>
+        !update || typeof update.file !== 'string' || typeof update.content !== 'string'
+    )) {
         return res.status(400).json({
-            message: 'Invalid request body. Expected a JSON object with an "updates" property containing an array of file updates.',
+            message: 'Invalid request body. Expected an "updates" array of objects with string file and content properties.',
             status: 'error',
         });
     }
 
-    const results = await Promise.all(updates.map(async (update) => {
-        const { file, content } = update;
-        const cleanFile = file.startsWith('/') ? file.slice(1) : file;
-        const filePath = path.join(WORKING_DIR, cleanFile);
+    let resolvedUpdates;
+    try {
+        resolvedUpdates = updates.map(({ file, content }) => ({
+            file,
+            content,
+            filePath: resolveWorkspacePath(file),
+        }));
+    } catch (err) {
+        return res.status(400).json({ message: err.message, status: 'error' });
+    }
+
+    const results = await Promise.all(resolvedUpdates.map(async ({ file, content, filePath }) => {
         try {
             await fs.promises.mkdir(path.dirname(filePath), { recursive: true });
             await fs.promises.writeFile(filePath, content, 'utf-8');
@@ -214,7 +244,9 @@ app.patch("/update-files", async (req, res) => {
         }
     }));
 
-    res.status(200).json({
+    const hasFailures = results.some((result) => Object.values(result)[0]?.startsWith('Error updating file:'));
+
+    res.status(hasFailures ? 500 : 200).json({
         message: 'File update results',
         results,
     });
@@ -228,17 +260,23 @@ app.patch("/update-files", async (req, res) => {
 app.post("/create-files", async (req, res) => {
     const files = req.body.files;
 
-    if (!files || !Array.isArray(files)) {
+    if (!Array.isArray(files) || files.some((file) =>
+        !file || typeof file.file !== 'string' || typeof file.content !== 'string'
+    )) {
         return res.status(400).json({
-            message: 'Invalid request body. Expected a JSON object with a "files" property containing an array of file objects.',
+            message: 'Invalid request body. Expected a "files" array of objects with string file and content properties.',
             status: 'error',
         });
     }
 
-    const results = await Promise.all(files.map(async (fileObj) => {
-        const { file, content } = fileObj;
-        const cleanFile = file.startsWith('/') ? file.slice(1) : file;
-        const filePath = path.join(WORKING_DIR, cleanFile);
+    let resolvedFiles;
+    try {
+        resolvedFiles = files.map(({ file, content }) => ({ file, content, filePath: resolveWorkspacePath(file) }));
+    } catch (err) {
+        return res.status(400).json({ message: err.message, status: 'error' });
+    }
+
+    const results = await Promise.all(resolvedFiles.map(async ({ file, content, filePath }) => {
         try {
             await fs.promises.mkdir(path.dirname(filePath), { recursive: true });
             await fs.promises.writeFile(filePath, content, 'utf-8');
@@ -252,7 +290,9 @@ app.post("/create-files", async (req, res) => {
         }
     }));
 
-    res.status(200).json({
+    const hasFailures = results.some((result) => Object.values(result)[0]?.startsWith('Error creating file:'));
+
+    res.status(hasFailures ? 500 : 200).json({
         message: 'File creation results',
         results,
     });

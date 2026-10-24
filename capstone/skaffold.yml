@@ -9,38 +9,33 @@ build:
   tagPolicy:
     sha256: {}
     
+  platforms:
+    - linux/amd64    
+    
   artifacts:
   - image: frontend
     context: frontend
     docker:
       dockerfile: Dockerfile
-    sync:
-      infer:
-        - "src/**"
+    
   
   - image: ai-orchestration
     context: ai-orchestration
     docker:
       dockerfile: dockerfile
-    sync:
-      infer:
-        - "src/**"
+    
 
   - image: auth
     context: auth
     docker:
       dockerfile: dockerfile
-    sync:
-      infer:
-        - "src/**"
+    
         
   - image: notification
     context: notification
     docker:
       dockerfile: dockerfile
-    sync:
-      infer:
-        - "src/**"      
+         
 
   - image: agent
     context: sandbox/agent
