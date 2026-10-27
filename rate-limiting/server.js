@@ -3,15 +3,17 @@ import express from "express";
 import morgan from "morgan";
 import mongoose from "mongoose";
 import Redis from "ioredis";
-import User from "./modules/user.model.js";
+import User from "./models/user.model.js";
 import rateLimit from 'express-rate-limit';
 
 
-// MongoDB connection
+
+
+
+// ---- MongoDB Connection ----
 const connectToMongoDB = async () => {
     try {
         await mongoose.connect(process.env.MONGO_URI);
-
         console.log("Connected to MongoDB");
     } catch (error) {
         console.error("Error connecting to MongoDB:", error);
@@ -20,44 +22,27 @@ const connectToMongoDB = async () => {
 
 connectToMongoDB();
 
-// Redis connection
+
+// ---- Redis Connection ----
 const redis = new Redis(process.env.REDIS_URI);
 
 redis.once("ready", () => {
     console.log("Connected to Redis");
 });
 
-redis.on("error", (error) => {
-    console.error("Redis connection error:", error);
-});
 
-// Express app
+// ---- Express App Setup ----
 const app = express();
-
 app.use(morgan("dev"));
 app.use(express.json());
 
-// GET user
-app.get("/user/:id", async (req, res) => {
-    try {
-        const user = await User.findOne({
-            _id: req.params.id,
-        });
 
-        res.json({
-            message: "User fetched successfully",
-            data: user,
-        });
-    } catch (error) {
-        console.error(error);
+// ---- ejs Template Engine Setup ----
+// app.set("view engine", "ejs");
 
-        res.status(500).json({
-            message: "Error fetching user",
-        });
-    }
-});
+// app.set("views", "./views");
 
-
+// app.use(express.static("public"));
 
 const globalLimiter = rateLimit({
     windowMs: 2 * 60 * 1000,  // 2 minutes
@@ -72,35 +57,58 @@ const globalLimiter = rateLimit({
 // Apply to every route
 app.use(globalLimiter);
 
-
-
-// POST user
-app.post("/user", async (req, res) => {
+// ---- Routes ----
+app.get("/user/:id", async (req, res) => {
     try {
-        const newUser = new User(req.body);
 
-        await newUser.save();
+//         const userFomCache = await redis.get(`user:${req.params.id}`);
 
-        res.status(201).json({
-            message: "User created successfully",
-            data: newUser,
+//         if (userFomCache) {
+//             return res.json({
+//                 message: "User fetched from cache",
+//                 data: JSON.parse(userFomCache)
+//             });
+//         }
+
+       const user = await User.findById(req.params.id);
+ if (!user) return res.status(404).json({ error: "User not found" });
+
+//         await redis.set(`user:${req.params.id}`, JSON.stringify(user), "EX", 60 * 60); // Cache for 1 hour
+
+        res.json({
+            message: "User fetched successfully",
+            data: user
         });
     } catch (error) {
-        console.error(error);
-
-        res.status(500).json({
-            message: "Error creating user",
-        });
+        res.status(500).json({ error: "Error fetching users" });
     }
 });
 
-// Start server
-const PORT = process.env.PORT || 3000;
+app.post("/user", async (req, res) => {
+    try {
+        const newUser = new User(req.body);
+        await newUser.save();
+        res.json({
+            message: "User created successfully",
+            data: newUser
+        });
+    } catch (error) {
+        res.status(500).json({ error: "Error creating user" });
+    }
+});
 
+// app.get("/", async (req, res) => {
+//     res.render("index", {
+//         username: "Building",
+//         bio: "Something about Building",
+//         profilePicture: "https://images.unsplash.com/photo-1779206746296-b7d3f467e55d?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxmZWF0dXJlZC1waG90b3MtZmVlZHw0OHx8fGVufDB8fHx8fA%3D%3D"
+//     });
+// });
+
+
+
+// ---- Start Server ----
+const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
 });
-
-
-
-            
