@@ -13,6 +13,7 @@
   "type": "module",
   "dependencies": {
     "dotenv": "^18.0.4",
+    "ejs": "^7.0.2",
     "express": "^5.2.1",
     "express-rate-limit": "^8.7.0",
     "ioredis": "^6.0.0",
@@ -20,6 +21,7 @@
     "morgan": "^1.12.1"
   },
   "devDependencies": {
-    "jest": "^30.5.2"
+    "jest": "^30.5.2",
+    "mongodb-memory-server": "^11.3.0"
   }
 }

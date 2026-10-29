@@ -61,19 +61,19 @@ app.use(globalLimiter);
 app.get("/user/:id", async (req, res) => {
     try {
 
-//         const userFomCache = await redis.get(`user:${req.params.id}`);
+        const userFomCache = await redis.get(`user:${req.params.id}`);
 
-//         if (userFomCache) {
-//             return res.json({
-//                 message: "User fetched from cache",
-//                 data: JSON.parse(userFomCache)
-//             });
-//         }
+        if (userFomCache) {
+            return res.json({
+                message: "User fetched from cache",
+                data: JSON.parse(userFomCache)
+            });
+        }
 
        const user = await User.findById(req.params.id);
  if (!user) return res.status(404).json({ error: "User not found" });
 
-//         await redis.set(`user:${req.params.id}`, JSON.stringify(user), "EX", 60 * 60); // Cache for 1 hour
+         await redis.set(`user:${req.params.id}`, JSON.stringify(user), "EX", 60 * 60); // Cache for 1 hour
 
         res.json({
             message: "User fetched successfully",
