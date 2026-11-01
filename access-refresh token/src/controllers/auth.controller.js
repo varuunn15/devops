@@ -8,10 +8,10 @@ let registerController = async (req, res) => {
   let { accessToken, refreshToken, newUser } = await registerService(req.body);
 
   res.cookie("accessToken", accessToken, {
-    httpOnly: true,
-    sameSite: "lax",
+    httpOnly: true, // to prevent XSS attacks
+    sameSite: "lax", // to prevent CSRF attacks
     secure: false,
-    maxAge: 10 * 60 * 1000,
+    maxAge: 10 * 60 * 1000, // expiration age of 10 minutes cookies
   });
 
   res.cookie("refreshToken", refreshToken, {
