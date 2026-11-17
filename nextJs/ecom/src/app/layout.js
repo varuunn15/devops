@@ -1,6 +1,7 @@
-import { Geist, Geist_Mono } from "next/font/google";
+import Navbar from "@/components/Navbar";
 import "./globals.css";
-
+import { ThemeProvider } from "@/components/themeProvider";
+import { AuthProvider } from "@/context/authContext";
 
 export const metadata = {
   title: "Create Next App",
@@ -9,11 +10,19 @@ export const metadata = {
 
 export default function RootLayout({ children }) {
   return (
-    <html
-      lang="en"
-      className={`h-full antialiased`}
-    >
-      <body className="min-h-full flex flex-col">{children}</body>
+    <html suppressHydrationWarning lang="en" className={` h-full antialiased`}>
+      <body className="h-screen gap-5 flex flex-col">
+        <AuthProvider>
+          <ThemeProvider
+            attribute="class"
+            defaultTheme="system"
+            enableSystem
+            disableTransitionOnChange
+          >
+            <div className="px-8 flex-1">{children}</div>
+          </ThemeProvider>
+        </AuthProvider>
+      </body>
     </html>
   );
 }

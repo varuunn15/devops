@@ -16,7 +16,7 @@ const Page = () => {
   let router = useRouter();
 
   const [formData, setFormData] = useState({});
-  console.log(formData);
+  const [errorMessage, setErrorMessage] = useState("");
 
   let handleChange = (e) => {
     let { name, value } = e.target;
@@ -25,12 +25,36 @@ const Page = () => {
 
   let handleSubmit = async (e) => {
     e.preventDefault();
+    setErrorMessage("");
 
     try {
-      let res = await api.post("/api/auth/login", formData);
-      hydrateUser();
+      const enteredName = formData.username?.trim();
+      const username =
+        enteredName?.toLowerCase() === "emily.johnson@x.dummyjson.com"
+          ? "emilys"
+          : enteredName;
+
+      const response = await api.post("/auth/login", {
+        username,
+        password: formData.password,
+        expiresInMins: 60,
+      });
+      const token = response.data.accessToken;
+
+      if (!token) throw new Error("The auth service did not return a token.");
+
+      window.localStorage.setItem("accessToken", token);
+      const user = await hydrateUser();
+
+      if (!user) {
+        throw new Error("Login succeeded, but your session could not be loaded.");
+      }
+
+      router.replace("/layout/home");
     } catch (error) {
-      console.log("error in login", error);
+      setErrorMessage(
+        error.response?.data?.message || error.message || "Login failed. Please try again.",
+      );
     }
   };
 
@@ -43,21 +67,29 @@ const Page = () => {
             <h1 className="text-3xl font-bold text-foreground">Welcome Back</h1>
 
             <p className="mt-2 text-sm text-muted-foreground">
-              Login to continue to your account
+              Demo login: <strong>emilys</strong> (or
+              <strong> emily.johnson@x.dummyjson.com</strong>) /{" "}
+              <strong>emilyspass</strong>
             </p>
           </div>
 
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-5">
+            {errorMessage && (
+              <p role="alert" className="text-sm text-red-600">
+                {errorMessage}
+              </p>
+            )}
             {/* Email */}
             <div className="space-y-2">
-              <Label>Email</Label>
+              <Label>Username or email</Label>
 
               <Input
-                name="email"
+                name="username"
                 onChange={handleChange}
-                type="email"
-                placeholder="Enter your email"
+                type="text"
+                autoComplete="username"
+                placeholder="Enter username or demo email"
               />
             </div>
 
@@ -69,6 +101,7 @@ const Page = () => {
                 name={"password"}
                 onChange={handleChange}
                 type="password"
+                autoComplete="current-password"
                 placeholder="Enter your password"
               />
             </div>
